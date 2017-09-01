@@ -3,6 +3,7 @@ package com.example.shiwenming_sx.mydownloader.utils;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
+import android.widget.Toast;
 
 import com.example.shiwenming_sx.mydownloader.entity.LoadInfo;
 import com.example.shiwenming_sx.mydownloader.entity.ThreadInfo;
@@ -32,7 +33,6 @@ public class Downloader {
 	private Handler mHandler;
 
 	private int mFileSize;
-
 
 	private List<ThreadInfo> infos;// 存放下载信息类的集合
 	private int state = INIT;
@@ -112,8 +112,9 @@ public class Downloader {
 			conn = (HttpURLConnection) url.openConnection();
 			conn.setConnectTimeout(5000);
 			conn.setRequestMethod("GET");
+			int responseCode = conn.getResponseCode();
 			// 如果http返回的代码是200或者206则为连接成功
-			if (conn.getResponseCode() == 200 || conn.getResponseCode() == 206) {
+			if (responseCode == 200 || responseCode == 206) {
 				mFileSize = conn.getContentLength();// 得到文件的大小
 				if (mFileSize <= 0) {
 					System.out.println("网络故障,无法获取文件大小");
@@ -131,6 +132,10 @@ public class Downloader {
 				randomFile.setLength(mFileSize);// 设置保存文件的大小
 				randomFile.close();
 				conn.disconnect();
+			} else {
+
+				Toast.makeText(MyApplication.getContext(), responseCode, Toast.LENGTH_SHORT).show();
+
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

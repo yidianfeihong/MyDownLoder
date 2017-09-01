@@ -103,7 +103,7 @@ public class DownloadService extends Service {
 
 	public void startDownload(final String fileName, final String url, final Handler handler) {
 
-		if (DataSupport.where("mUrl = ?", url).count(FileStatus.class)>0) {
+		if (DataSupport.where("mUrl = ?", url).count(FileStatus.class) > 0) {
 
 			Toast.makeText(this, "任务已在下载中", Toast.LENGTH_SHORT).show();
 			return;
@@ -153,46 +153,42 @@ public class DownloadService extends Service {
 		downloader.pause();
 	}
 
-//	//继续下载
-//	public void reDownload(final Button button, final String url, final String name, final Handler mHandler) {
-//		new Thread(new Runnable() {
-//			@Override
-//			public void run() {
-//				String fileName = dao.getFileName(url);
-//
-//				downloader = downloaders.get(url);
-//				if (downloader == null) {
-//					downloader = new Downloader(url, savePath, fileName, threadCount, DownloadService.this, handler);
-//					downloaders.put(url, downloader);
-//				}
-//				if (downloader.isDownloading())
-//					return;
-//
-//				LoadInfo loadInfo = downloader.getDownloaderInfors();
-//
-//				if (loadInfo != null && !fileName.equals("")) {
-//					if (!completeSizes.containsKey(url)) {
-//						completeSizes.put(url, loadInfo.getComplete());
-//					}
-//					if (!fileSizes.containsKey(url)) {
-//						fileSizes.put(url, loadInfo.getFileSize());
-//					}
-//
-//					downloader.download();
-//
-//					Message msg = new Message();
-//					msg.what = 1;
-//					msg.obj = button;
-//					mHandler.sendMessage(msg);
-//				} else {
-//					Message msg = new Message();
-//					msg.what = 2;
-//					msg.obj = button;
-//					mHandler.sendMessage(msg);
-//				}
-//			}
-//		}).start();
-//	}
+	//继续下载
+	public void continueDownload(final Button button, final String url, final String name, final Handler mHandler) {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				String fileName = dao.getFileName(url);
+
+				downloader = downloaders.get(url);
+				if (downloader == null) {
+					downloader = new Downloader(url, savePath, fileName, threadCount, DownloadService.this, handler);
+					downloaders.put(url, downloader);
+				}
+				if (downloader.isDownloading())
+					return;
+
+				LoadInfo loadInfo = downloader.getDownloaderInfors();
+
+				if (loadInfo != null && !fileName.equals("")) {
+					if (!completeSizes.containsKey(url)) {
+						completeSizes.put(url, loadInfo.getComplete());
+					}
+					downloader.download();
+
+					Message msg = new Message();
+					msg.what = 1;
+					msg.obj = button;
+					mHandler.sendMessage(msg);
+				} else {
+					Message msg = new Message();
+					msg.what = 2;
+					msg.obj = button;
+					mHandler.sendMessage(msg);
+				}
+			}
+		}).start();
+	}
 
 	public void delete(final String url) {
 		Downloader down = mDownloaders.get(url);
@@ -200,26 +196,23 @@ public class DownloadService extends Service {
 			down.pause();
 		}
 
-		mHandler.postDelayed(new Runnable() {
-			@Override
-			public void run() {
-				DataSupport.deleteAll(FileStatus.class, "mUrl = ?", url);
+		DataSupport.deleteAll(FileStatus.class, "mUrl = ?", url);
 
-				for (int i = 0; i < mFileStatusList.size(); i++) {
-					FileStatus fileStatus = mFileStatusList.get(i);
-					if (fileStatus.getUrl().equals(url)) {
-						mFileStatusList.remove(i);
-					}
-				}
-
-				mDownloaders.remove(url);
-				completeSizes.remove(url);
-				if (loadCallback != null) {
-					loadCallback.deleteFile(url);
-				}
+		for (int i = 0; i < mFileStatusList.size(); i++) {
+			FileStatus fileStatus = mFileStatusList.get(i);
+			if (fileStatus.getUrl().equals(url)) {
+				mFileStatusList.remove(i);
 			}
-		}, 1000);
+		}
+
+		mDownloaders.remove(url);
+		completeSizes.remove(url);
+		if (loadCallback != null) {
+			loadCallback.deleteFile(url);
+		}
+
 	}
+
 
 	public interface DownLoadCallback {
 		public void refreshUI(List<FileStatus> fileStatuses);

@@ -57,10 +57,9 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		public void handleMessage(Message msg) {
 			super.handleMessage(msg);
 			if (msg.what == 1) {
-				mBtnDownload.setText("暂停");
-				mBtnDownload.setClickable(true);
+				Toast.makeText(MainActivity.this, "开始下载", Toast.LENGTH_SHORT).show();
 			} else if (msg.what == 2) {
-				Toast.makeText(MainActivity.this, "下载失败", Toast.LENGTH_SHORT).show();
+//				Toast.makeText(MainActivity.this, "下载失败", Toast.LENGTH_SHORT).show();
 			}
 		}
 	};
@@ -101,7 +100,8 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		mBtnDownload.setOnClickListener(this);
 
 		mEtUrl = (EditText) findViewById(R.id.et_input);
-		mEtUrl.setText("http://dlsw.baidu.com/sw-search-sp/soft/40/12856/QIYImedia_1_06.1400202272.exe");
+//		mEtUrl.setText("http://dlsw.baidu.com/sw-search-sp/soft/40/12856/QIYImedia_1_06.1400202272.exe");
+		mEtUrl.setText("http://182.254.212.207:8080/download/newsreader.apk");
 		mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
 
 		mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -126,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		mService = ((DownloadService.MyBinder) iBinder).getService();
 		if (mService != null) {
 
-			mAdapter = new DownloadAdapter(DownloadService.mFileStatusList);
+			mAdapter = new DownloadAdapter(MainActivity.this, mService, DownloadService.mFileStatusList);
 			mRecyclerView.setAdapter(mAdapter);
 
 			mService.setLoadCallback(new DownloadService.DownLoadCallback() {
@@ -137,15 +137,15 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 				}
 
 				@Override
-				public void deleteFile (String url){
+				public void deleteFile(String url) {
 					mAdapter.notifyDataSetChanged();
 				}
 
 			});
+		}
+
+
 	}
-
-
-}
 
 	@Override
 	public void onServiceDisconnected(ComponentName componentName) {
@@ -161,7 +161,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 				Toast.makeText(mService, "开始下载", Toast.LENGTH_SHORT).show();
 				mUrl = mEtUrl.getText().toString().trim();
 				mName = getFileName(mUrl);
-				mService.startDownload(mName, mUrl,mHandler);
+				mService.startDownload(mName, mUrl, mHandler);
 				break;
 		}
 
