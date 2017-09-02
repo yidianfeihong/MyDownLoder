@@ -1,10 +1,10 @@
 package com.example.shiwenming_sx.mydownloader.utils;
 
-import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
 import android.widget.Toast;
 
+import com.example.shiwenming_sx.mydownloader.entity.FileStatus;
 import com.example.shiwenming_sx.mydownloader.entity.LoadInfo;
 import com.example.shiwenming_sx.mydownloader.entity.ThreadInfo;
 
@@ -17,6 +17,7 @@ import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 
 import java.net.URL;
+import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -63,7 +64,7 @@ public class Downloader {
 	 * 获取下载器基本信息，用以判断状态是否正常
 	 **/
 
-	public LoadInfo getDownloaderInfors() {
+	public LoadInfo getDownloaderInfos() {
 		if (isFirst(mDownPath)) {
 			if (init())// 第1次下载要进行初始化
 			{
@@ -79,17 +80,18 @@ public class Downloader {
 				for (ThreadInfo item : infos) {
 					item.save();
 				}
+
 				LoadInfo loadInfo = new LoadInfo(mFileSize, 0, mDownPath);
 				return loadInfo;
 			}
 			return null;
 		} else {
-			infos = DataSupport.findAll(ThreadInfo.class);
+			infos = DataSupport.where("mUrl = ?",mDownPath).find(ThreadInfo.class);
 			if (infos != null && infos.size() > 0) {
 				int size = 0;
 				int completeSize = 0;
 				for (ThreadInfo info : infos) {
-					completeSize += info.getCompeleteSize();
+					completeSize += info.getCompleteSize();
 					size += info.getEndPos() - info.getStartPos() + mThreadCount - 1;
 				}
 				LoadInfo loadInfo = new LoadInfo(size, completeSize, mDownPath);
@@ -165,7 +167,7 @@ public class Downloader {
 			}
 			state = DOWNLOADING;// 把状态设置为正在下载
 			for (ThreadInfo info : infos) {
-				new MyThread(info.getThreadId(), info.getStartPos(), info.getEndPos(), info.getCompeleteSize(), info.getUrl()).start();
+				new MyThread(info.getThreadId(), info.getStartPos(), info.getEndPos(), info.getCompleteSize(), info.getUrl()).start();
 			}
 		}
 	}
@@ -184,8 +186,7 @@ public class Downloader {
 	 * 判断是否是第一次下载，利用litepal查询数据库中是否有下载这个地址的记录
 	 */
 	private boolean isFirst(String url) {
-
-		return DataSupport.where("mUrl=?", "url").count(ThreadInfo.class) == 0;
+		return DataSupport.where("mUrl = ?", url).count(ThreadInfo.class) == 0;
 	}
 
 
@@ -229,8 +230,15 @@ public class Downloader {
 						compeleteSize += length;
 						// 更新数据库中的下载信息
 						ThreadInfo threadInfo = new ThreadInfo();
-						threadInfo.setCompeleteSize(compeleteSize);
-						threadInfo.updateAll("mUrl = ? and mThreadId=?", mDownPath, threadId + "");
+						threadInfo.setCompleteSize(compeleteSize);
+						threadInfo.updateAll("mUrl = ? and mThreadId= ?", mDownPath, threadId + "");
+
+
+						FileStatus status = new FileStatus();
+						int sum = DataSupport.where("mUrl = ?",urlstr).sum(ThreadInfo.class,"mCompleteSize",int.class);
+						status.setCompleteSize(sum);
+						status.updateAll("mUrl = ? ", mDownPath);
+
 						// 用消息将下载信息传给进度条，对进度条进行更新
 						Message message = Message.obtain();
 						message.what = 1;

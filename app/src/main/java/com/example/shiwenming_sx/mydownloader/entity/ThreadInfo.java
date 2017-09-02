@@ -11,18 +11,18 @@ public class ThreadInfo extends DataSupport {
 	private int mThreadId;
 	private int mStartPos;
 	private int mEndPos;
-	private int mCompeleteSize;
+	private int mCompleteSize;
 	private String mUrl;
 
 	public ThreadInfo() {
 
 	}
 
-	public ThreadInfo(int threadId, int startPos, int endPos, int compeleteSize, String url) {
+	public ThreadInfo(int threadId, int startPos, int endPos, int completeSize, String url) {
 		mThreadId = threadId;
 		mStartPos = startPos;
 		mEndPos = endPos;
-		mCompeleteSize = compeleteSize;
+		mCompleteSize = completeSize;
 		mUrl = url;
 	}
 
@@ -50,12 +50,12 @@ public class ThreadInfo extends DataSupport {
 		mEndPos = endPos;
 	}
 
-	public int getCompeleteSize() {
-		return mCompeleteSize;
+	public int getCompleteSize() {
+		return mCompleteSize;
 	}
 
-	public void setCompeleteSize(int compeleteSize) {
-		mCompeleteSize = compeleteSize;
+	public void setCompleteSize(int completeSize) {
+		mCompleteSize = completeSize;
 	}
 
 	public String getUrl() {

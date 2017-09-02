@@ -18,12 +18,12 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:orientation="vertical"
-        android:padding="10dp"
+        android:padding="5dp"
         >
 
         <TextView
             android:id="@+id/tv_filename"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
             android:text="欢乐斗地主"
@@ -33,7 +33,7 @@
 
         <TextView
             android:id="@+id/tv_progress"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_below="@id/tv_filename"
             android:text="39.1M/73.8M"
@@ -57,7 +57,7 @@
                 android:id="@+id/btn_change_state"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="暂停"
+                android:text="开始"
                 />
 
             <Button

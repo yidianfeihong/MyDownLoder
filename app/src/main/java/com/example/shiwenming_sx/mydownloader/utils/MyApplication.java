@@ -1,5 +1,6 @@
 package com.example.shiwenming_sx.mydownloader.utils;
 
+import android.app.Application;
 import android.content.Context;
 
 import org.litepal.LitePalApplication;

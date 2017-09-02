@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -17,6 +18,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
@@ -27,6 +29,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.shiwenming_sx.mydownloader.BuildConfig;
 import com.example.shiwenming_sx.mydownloader.R;
 import com.example.shiwenming_sx.mydownloader.adapter.DownloadAdapter;
 import com.example.shiwenming_sx.mydownloader.entity.FileStatus;
@@ -59,7 +62,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 			if (msg.what == 1) {
 				Toast.makeText(MainActivity.this, "开始下载", Toast.LENGTH_SHORT).show();
 			} else if (msg.what == 2) {
-//				Toast.makeText(MainActivity.this, "下载失败", Toast.LENGTH_SHORT).show();
+				Toast.makeText(MainActivity.this, "下载失败", Toast.LENGTH_SHORT).show();
 			}
 		}
 	};
@@ -70,7 +73,10 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		initView();
-		verifyStoragePermissions(this);
+
+		if (Build.VERSION.SDK_INT >= 23) {
+			verifyStoragePermissions(this);
+		}
 
 		Intent intent = new Intent(this, DownloadService.class);
 		startService(intent);
@@ -83,7 +89,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 	public static void verifyStoragePermissions(Activity activity) {
 
 		try {
-			//检测是否有写的权限
+
 			int permission = ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
 			if (permission != PackageManager.PERMISSION_GRANTED) {
 				// 没有写的权限，去申请写的权限，会弹出对话框
@@ -100,7 +106,6 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		mBtnDownload.setOnClickListener(this);
 
 		mEtUrl = (EditText) findViewById(R.id.et_input);
-//		mEtUrl.setText("http://dlsw.baidu.com/sw-search-sp/soft/40/12856/QIYImedia_1_06.1400202272.exe");
 		mEtUrl.setText("http://182.254.212.207:8080/download/newsreader.apk");
 		mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
 
@@ -128,12 +133,27 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 
 			mAdapter = new DownloadAdapter(MainActivity.this, mService, DownloadService.mFileStatusList);
 			mRecyclerView.setAdapter(mAdapter);
+			((DefaultItemAnimator) mRecyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
 
 			mService.setLoadCallback(new DownloadService.DownLoadCallback() {
 				@Override
-				public void refreshUI(List<FileStatus> fileStatuses) {
-					mAdapter.mFileStatuses = fileStatuses;
-					mAdapter.notifyDataSetChanged();
+				public void refreshUI(FileStatus fileStatus) {
+
+					if (fileStatus.getCompleteSize() == fileStatus.getFileSize()) {
+						mAdapter.notifyDataSetChanged();
+						return;
+					}
+
+					for (int i = 0; i < mAdapter.mFileStatuses.size(); i++) {
+
+						if (mAdapter.mFileStatuses.get(i).getUrl().equals(fileStatus.getUrl())) {
+							mAdapter.mFileStatuses.set(i, fileStatus);
+							mAdapter.notifyItemChanged(i);
+							return;
+						}
+
+					}
+
 				}
 
 				@Override

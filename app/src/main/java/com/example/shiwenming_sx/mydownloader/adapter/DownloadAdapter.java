@@ -59,8 +59,9 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 			if (downloader != null && downloader.isDownloading()) {
 				holder.statusChange.setText("暂停");
 			} else {
-				holder.statusChange.setText("开始下载");
+				holder.statusChange.setText("开始");
 			}
+
 			holder.downProgress.setVisibility(View.VISIBLE);
 			holder.progressBar.setVisibility(View.VISIBLE);
 		}
@@ -74,14 +75,16 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 		holder.statusChange.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View view) {
+
 				if (fileStatus.getCompleteSize() == fileStatus.getFileSize()) {
 					return;
 				}
 				if (downloader != null && downloader.isDownloading()) {
-					holder.statusChange.setText("开始下载");
+					((Button) view).setText("开始");
 					mService.Pause(downloader);
 				} else {
 					holder.statusChange.setText("暂停");
+					mService.continueDownload(fileStatus.getFileName(), fileStatus.getUrl());
 				}
 			}
 		});
@@ -102,7 +105,7 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 		holder.restart.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View view) {
-
+				mService.reDownload(fileStatus);
 			}
 		});
 
