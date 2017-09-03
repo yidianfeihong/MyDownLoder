@@ -74,7 +74,6 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		startService(intent);
 		bindService(intent, this, Context.BIND_AUTO_CREATE);
 
-
 	}
 
 

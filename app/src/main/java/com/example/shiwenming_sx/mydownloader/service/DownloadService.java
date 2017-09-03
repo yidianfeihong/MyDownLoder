@@ -47,16 +47,19 @@ public class DownloadService extends Service {
 				case 2:
 					int responseCode = msg.arg1;
 					if (responseCode >= 400 && responseCode < 500) {
-						Toast.makeText(DownloadService.this, responseCode+"请求错误", Toast.LENGTH_SHORT).show();
+						Toast.makeText(DownloadService.this, responseCode + "请求错误", Toast.LENGTH_SHORT).show();
 					} else if (responseCode >= 500) {
-						Toast.makeText(DownloadService.this, responseCode+"服务器错误", Toast.LENGTH_SHORT).show();
-					}else {
+						Toast.makeText(DownloadService.this, responseCode + "服务器错误", Toast.LENGTH_SHORT).show();
+					} else {
 						Toast.makeText(DownloadService.this, "状态码异常", Toast.LENGTH_SHORT).show();
 					}
 					break;
 				case 3:
 					String str = ((Exception) msg.obj).toString();
 					Toast.makeText(DownloadService.this, str, Toast.LENGTH_SHORT).show();
+					break;
+				case 4:
+					Toast.makeText(DownloadService.this, (CharSequence) msg.obj, Toast.LENGTH_SHORT).show();
 					break;
 			}
 		}
@@ -197,10 +200,9 @@ public class DownloadService extends Service {
 						completeSizes.put(url, loadInfo.getComplete());
 					}
 					mDownloader.download();
-
-					Toast.makeText(DownloadService.this, "继续下载成功", Toast.LENGTH_SHORT).show();
+					sendInfo("继续下载成功");
 				} else {
-					Toast.makeText(DownloadService.this, "继续下载失败", Toast.LENGTH_SHORT).show();
+					sendInfo("继续下载失败");
 				}
 			}
 		}).start();
@@ -266,16 +268,25 @@ public class DownloadService extends Service {
 					stat.updateAll("mUrl = ?", url);
 					completeSizes.put(url, loadInfo.getComplete());
 					downloader.download();
-
-					Toast.makeText(DownloadService.this, "重新下载成功", Toast.LENGTH_SHORT).show();
+					sendInfo("重新下载成功");
 				} else {
-					Toast.makeText(DownloadService.this, "重新下载失败", Toast.LENGTH_SHORT).show();
+					sendInfo("重新下载失败");
 				}
 
 
 			}
 		}).start();
 
+
+	}
+
+
+	public void sendInfo(String info) {
+
+		Message message = Message.obtain();
+		message.what = 4;
+		message.obj = info;
+		mHandler.sendMessage(message);
 
 	}
 
