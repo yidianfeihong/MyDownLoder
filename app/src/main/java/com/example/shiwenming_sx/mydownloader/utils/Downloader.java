@@ -1,5 +1,6 @@
 package com.example.shiwenming_sx.mydownloader.utils;
 
+import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
 import android.widget.Toast;
@@ -17,9 +18,23 @@ import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 
 import java.net.URL;
+import java.net.URLConnection;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 /**
  * Created by shiwenming_sx on 2017/8/29.
@@ -30,7 +45,7 @@ public class Downloader {
 	private String mSavePath = "/sdcard/MyDownloader/";
 
 	private String mFileName;
-	private int mThreadCount = 3;
+	private int mThreadCount = 5;
 	private Handler mHandler;
 
 	private int mFileSize;
@@ -86,7 +101,7 @@ public class Downloader {
 			}
 			return null;
 		} else {
-			infos = DataSupport.where("mUrl = ?",mDownPath).find(ThreadInfo.class);
+			infos = DataSupport.where("mUrl = ?", mDownPath).find(ThreadInfo.class);
 			if (infos != null && infos.size() > 0) {
 				int size = 0;
 				int completeSize = 0;
@@ -105,18 +120,30 @@ public class Downloader {
 	 * 初始化
 	 */
 	private Boolean init() {
-		boolean result = true;
+		boolean result = false;
 
 		HttpURLConnection conn = null;
 		RandomAccessFile randomFile = null;
 		try {
 			URL url = new URL(mDownPath);
 			conn = (HttpURLConnection) url.openConnection();
+			constructHttps(conn);
 			conn.setConnectTimeout(5000);
 			conn.setRequestMethod("GET");
 			int responseCode = conn.getResponseCode();
+			// 如果http返回的代码是302则获取跳转地址重新发起请求
+			if (responseCode == 302) {
+				String location = conn.getHeaderField("Location");
+				url = new URL(location);
+				conn = (HttpURLConnection) url.openConnection();
+				conn.setConnectTimeout(5000);
+				conn.setRequestMethod("GET");
+				responseCode = conn.getResponseCode();
+			}
+
 			// 如果http返回的代码是200或者206则为连接成功
 			if (responseCode == 200 || responseCode == 206) {
+				result = true;
 				mFileSize = conn.getContentLength();// 得到文件的大小
 				if (mFileSize <= 0) {
 					System.out.println("网络故障,无法获取文件大小");
@@ -136,12 +163,19 @@ public class Downloader {
 				conn.disconnect();
 			} else {
 
-				Toast.makeText(MyApplication.getContext(), responseCode, Toast.LENGTH_SHORT).show();
-
+				Message message = Message.obtain();
+				message.what = 2;
+				message.arg1 = responseCode;
+				mHandler.sendMessage(message);
 			}
 		} catch (Exception e) {
+
+			Message message = Message.obtain();
+			message.what = 3;
+			message.obj = e;
+			mHandler.sendMessage(message);
+
 			e.printStackTrace();
-			result = false;
 			System.out.println("----------------首次下载初始化失败----------------");
 		} finally {
 			try {
@@ -190,6 +224,32 @@ public class Downloader {
 	}
 
 
+
+	private void constructHttps(HttpURLConnection conn) {
+
+		if (conn instanceof HttpsURLConnection) {
+			SSLContext context = null;
+			try {
+				context = SSLContext.getInstance("TLS");
+				context.init(null, new TrustManager[]{new TrustAllManager()}, null);
+				HttpsURLConnection.setDefaultSSLSocketFactory(context.getSocketFactory());
+				HttpsURLConnection.setDefaultHostnameVerifier(new HostnameVerifier() {
+
+					@Override
+					public boolean verify(String arg0, SSLSession arg1) {
+						return true;
+					}
+				});
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+
+
+
+
 	public class MyThread extends Thread {
 		private int threadId;
 		private int startPos;
@@ -216,13 +276,24 @@ public class Downloader {
 			try {
 				URL url = new URL(this.urlstr);
 				conn = (HttpURLConnection) url.openConnection();
+				constructHttps(conn);
 				constructConn(conn);
+				int responseCode = conn.getResponseCode();
 				System.out.println("responseCode:" + conn.getResponseCode());
-				if (conn.getResponseCode() == 200 || conn.getResponseCode() == 206) {
+				// 如果http返回的代码是302则获取跳转地址重新发起请求
+				if (responseCode == 302) {
+					String location = conn.getHeaderField("Location");
+					url = new URL(location);
+					conn = (HttpURLConnection) url.openConnection();
+					constructConn(conn);
+					responseCode = conn.getResponseCode();
+				}
+
+				if (responseCode == 200 || responseCode == 206) {
 					randomAccessFile = new RandomAccessFile(file, "rwd");
 					randomAccessFile.seek(this.startPos + this.compeleteSize);
 					inStream = conn.getInputStream();
-					byte buffer[] = new byte[1024];
+					byte buffer[] = new byte[4096];
 					int length = 0;
 
 					while ((length = inStream.read(buffer, 0, buffer.length)) != -1) {
@@ -235,7 +306,7 @@ public class Downloader {
 
 
 						FileStatus status = new FileStatus();
-						int sum = DataSupport.where("mUrl = ?",urlstr).sum(ThreadInfo.class,"mCompleteSize",int.class);
+						int sum = DataSupport.where("mUrl = ?", urlstr).sum(ThreadInfo.class, "mCompleteSize", int.class);
 						status.setCompleteSize(sum);
 						status.updateAll("mUrl = ? ", mDownPath);
 
@@ -273,10 +344,12 @@ public class Downloader {
 
 		}
 
+
 		/**
 		 * 构建请求连接时的参数 返回开始下载的位置
 		 */
 		private void constructConn(HttpURLConnection conn) throws IOException {
+
 			conn.setConnectTimeout(5 * 1000);
 			conn.setRequestMethod("GET");
 			conn.setRequestProperty("Charset", "UTF-8");
@@ -287,5 +360,31 @@ public class Downloader {
 		}
 
 	}
+
+
+
+	private class TrustAllManager implements X509TrustManager {
+
+		@Override
+		public void checkClientTrusted(X509Certificate[] chain, String authType)
+				throws CertificateException {
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public void checkServerTrusted(X509Certificate[] chain, String authType)
+				throws CertificateException {
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public X509Certificate[] getAcceptedIssuers() {
+			// TODO Auto-generated method stub
+			return null;
+		}
+	}
+
 
 }

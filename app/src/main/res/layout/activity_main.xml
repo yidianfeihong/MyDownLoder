@@ -39,13 +39,46 @@
             android:maxLines="5"
             />
 
-        <Button
-            android:id="@+id/btn_download"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:text="下载"
-            />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <Button
+                android:id="@+id/btn_test1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="url1"
+                />
+
+            <Button
+                android:id="@+id/btn_test2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="url2"
+                />
+
+            <Button
+                android:id="@+id/btn_test3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="url3"
+                />
+
+            <Button
+                android:id="@+id/btn_download"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_weight="1"
+                android:text="下载"
+                />
+
+        </LinearLayout>
+
 
     </LinearLayout>
 

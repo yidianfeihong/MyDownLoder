@@ -35,6 +35,7 @@ import com.example.shiwenming_sx.mydownloader.adapter.DownloadAdapter;
 import com.example.shiwenming_sx.mydownloader.entity.FileStatus;
 import com.example.shiwenming_sx.mydownloader.service.DownloadService;
 import com.example.shiwenming_sx.mydownloader.utils.Downloader;
+import com.example.shiwenming_sx.mydownloader.utils.MyApplication;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,6 +45,9 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity implements ServiceConnection, View.OnClickListener {
 
 	private Button mBtnDownload;
+	private Button mTest1;
+	private Button mTest2;
+	private Button mTest3;
 	private DownloadService mService;
 	private EditText mEtUrl;
 	private String mName;
@@ -54,18 +58,6 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 
 	private static String[] PERMISSIONS_STORAGE = {Manifest.permission.WRITE_EXTERNAL_STORAGE,
 			Manifest.permission.READ_EXTERNAL_STORAGE};
-
-	private Handler mHandler = new Handler() {
-		@Override
-		public void handleMessage(Message msg) {
-			super.handleMessage(msg);
-			if (msg.what == 1) {
-				Toast.makeText(MainActivity.this, "开始下载", Toast.LENGTH_SHORT).show();
-			} else if (msg.what == 2) {
-				Toast.makeText(MainActivity.this, "下载失败", Toast.LENGTH_SHORT).show();
-			}
-		}
-	};
 
 
 	@Override
@@ -105,10 +97,18 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		mBtnDownload = (Button) findViewById(R.id.btn_download);
 		mBtnDownload.setOnClickListener(this);
 
-		mEtUrl = (EditText) findViewById(R.id.et_input);
-		mEtUrl.setText("http://182.254.212.207:8080/download/newsreader.apk");
-		mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
+		mTest1 = (Button) findViewById(R.id.btn_test1);
+		mTest1.setOnClickListener(this);
+		mTest2 = (Button) findViewById(R.id.btn_test2);
+		mTest2.setOnClickListener(this);
+		mTest3 = (Button) findViewById(R.id.btn_test3);
+		mTest3.setOnClickListener(this);
 
+		mEtUrl = (EditText) findViewById(R.id.et_input);
+
+
+		mEtUrl.setText("http://gdown.baidu.com/data/wisegame/76c57604973e1ff3/zhihu_529.apk");
+		mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
 		mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
 
 
@@ -178,11 +178,25 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 
 		switch (view.getId()) {
 			case R.id.btn_download:
-				Toast.makeText(mService, "开始下载", Toast.LENGTH_SHORT).show();
 				mUrl = mEtUrl.getText().toString().trim();
 				mName = getFileName(mUrl);
-				mService.startDownload(mName, mUrl, mHandler);
+				mService.startDownload(mName, mUrl);
 				break;
+
+			case R.id.btn_test1:
+
+				mEtUrl.setText("http://gdown.baidu.com/data/wisegame/e54e3c5bc84070c2/weixin_1100.apk");
+				break;
+			case R.id.btn_test2:
+
+				mEtUrl.setText("http://gdown.baidu.com/data/wisegame/74fc094b8c60d732/QQliulanqi_7803540.apk");
+				break;
+			case R.id.btn_test3:
+
+				mEtUrl.setText("http://gdown.baidu.com/data/wisegame/67c8bec51d1abe78/aiqiyi_80930.apk");
+				break;
+
+
 		}
 
 	}

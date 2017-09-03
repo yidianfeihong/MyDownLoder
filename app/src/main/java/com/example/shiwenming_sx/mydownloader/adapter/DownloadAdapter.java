@@ -66,7 +66,7 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 			holder.progressBar.setVisibility(View.VISIBLE);
 		}
 
-		holder.fileIcon.setImageResource(R.mipmap.ic_launcher);
+		holder.fileIcon.setImageResource(R.drawable.icon);
 		holder.fileName.setText(fileStatus.getFileName());
 		holder.downProgress.setText(fileStatus.getCompleteSize() / 1024 / 1024 + "M/" + fileStatus.getFileSize() / 1014 / 1024 + "M");
 		holder.progressBar.setMax(fileStatus.getFileSize());
