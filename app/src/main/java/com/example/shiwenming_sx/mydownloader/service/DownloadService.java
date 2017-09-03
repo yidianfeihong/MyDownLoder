@@ -15,6 +15,7 @@ import com.example.shiwenming_sx.mydownloader.utils.Downloader;
 
 import org.litepal.crud.DataSupport;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,8 +25,10 @@ public class DownloadService extends Service {
 
 	public static Map<String, Downloader> mDownloaders = new HashMap<String, Downloader>();
 	public static List<FileStatus> mFileStatusList = new ArrayList<FileStatus>();
-	private static Map<String, Integer> completeSizes = new HashMap<String, Integer>();
+	public static Map<String, Integer> completeSizes = new HashMap<String, Integer>();
 	private FileStatus mFileStatus = null;
+	private String mSavePath = "/sdcard/MyDownloader/";
+
 
 	private Downloader mDownloader;
 	private DownLoadCallback loadCallback;
@@ -58,9 +61,6 @@ public class DownloadService extends Service {
 					String str = ((Exception) msg.obj).toString();
 					Toast.makeText(DownloadService.this, str, Toast.LENGTH_SHORT).show();
 					break;
-				case 4:
-					Toast.makeText(DownloadService.this, (CharSequence) msg.obj, Toast.LENGTH_SHORT).show();
-					break;
 			}
 		}
 
@@ -88,6 +88,7 @@ public class DownloadService extends Service {
 
 						temp.setStatus(1);
 						temp.updateAll("mUrl = ?", url);
+
 
 					} else {
 
@@ -133,6 +134,7 @@ public class DownloadService extends Service {
 
 	}
 
+
 	public void startDownload(final String fileName, final String url) {
 
 		if (DataSupport.where("mUrl = ?", url).count(FileStatus.class) > 0) {
@@ -148,7 +150,7 @@ public class DownloadService extends Service {
 
 				mDownloader = mDownloaders.get(url);
 				if (mDownloader == null) {
-					mDownloader = new Downloader(fileName, url, mHandler);
+					mDownloader = new Downloader(fileName, mSavePath, url, mHandler);
 					mDownloaders.put(url, mDownloader);
 				}
 
@@ -187,7 +189,7 @@ public class DownloadService extends Service {
 			public void run() {
 				mDownloader = mDownloaders.get(url);
 				if (mDownloader == null) {
-					mDownloader = new Downloader(fileName, url, mHandler);
+					mDownloader = new Downloader(fileName, mSavePath, url, mHandler);
 					mDownloaders.put(url, mDownloader);
 				}
 				if (mDownloader.isDownloading())
@@ -200,15 +202,13 @@ public class DownloadService extends Service {
 						completeSizes.put(url, loadInfo.getComplete());
 					}
 					mDownloader.download();
-					sendInfo("继续下载成功");
-				} else {
-					sendInfo("继续下载失败");
+
 				}
 			}
 		}).start();
 	}
 
-	public void delete(final String url) {
+	public void delete(String fileName, final String url) {
 		Downloader down = mDownloaders.get(url);
 		if (down != null) {
 			down.pause();
@@ -217,6 +217,11 @@ public class DownloadService extends Service {
 		DataSupport.deleteAll(FileStatus.class, "mUrl = ?", url);
 		DataSupport.deleteAll(ThreadInfo.class, "mUrl = ?", url);
 
+
+		File file = new File(mSavePath + fileName);
+		if (file.exists()) {
+			file.delete();
+		}
 
 		mHandler.postDelayed(new Runnable() {
 			@Override
@@ -254,7 +259,7 @@ public class DownloadService extends Service {
 					downloader.pause();
 				}
 
-				downloader = new Downloader(fileName, url, mHandler);
+				downloader = new Downloader(fileName, mSavePath, url, mHandler);
 
 				DataSupport.deleteAll(ThreadInfo.class, "mUrl = ?", url);
 				mDownloaders.put(url, downloader);
@@ -268,25 +273,11 @@ public class DownloadService extends Service {
 					stat.updateAll("mUrl = ?", url);
 					completeSizes.put(url, loadInfo.getComplete());
 					downloader.download();
-					sendInfo("重新下载成功");
-				} else {
-					sendInfo("重新下载失败");
 				}
-
 
 			}
 		}).start();
 
-
-	}
-
-
-	public void sendInfo(String info) {
-
-		Message message = Message.obtain();
-		message.what = 4;
-		message.obj = info;
-		mHandler.sendMessage(message);
 
 	}
 

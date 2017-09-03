@@ -96,7 +96,7 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 				builder.setTitle("温馨提示").setMessage("确定要删除文件吗").setPositiveButton("确定", new DialogInterface.OnClickListener() {
 					@Override
 					public void onClick(DialogInterface arg0, int arg1) {
-						mService.delete(fileStatus.getUrl());
+						mService.delete(fileStatus.getFileName(),fileStatus.getUrl());
 					}
 				}).setNegativeButton("取消", null).create().show();
 

@@ -42,7 +42,7 @@ import javax.net.ssl.X509TrustManager;
 
 public class Downloader {
 	private String mDownPath;
-	private String mSavePath = "/sdcard/MyDownloader/";
+	private String mSavePath;
 
 	private String mFileName;
 	private int mThreadCount = 5;
@@ -57,7 +57,8 @@ public class Downloader {
 	private static final int PAUSE = 3;
 
 
-	public Downloader(String fileName, String url, Handler handler) {
+	public Downloader(String fileName, String savePath, String url, Handler handler) {
+		mSavePath = savePath;
 		mDownPath = url;
 		mFileName = fileName;
 		mHandler = handler;
@@ -224,7 +225,6 @@ public class Downloader {
 	}
 
 
-
 	private void constructHttps(HttpURLConnection conn) {
 
 		if (conn instanceof HttpsURLConnection) {
@@ -245,9 +245,6 @@ public class Downloader {
 			}
 		}
 	}
-
-
-
 
 
 	public class MyThread extends Thread {
@@ -305,10 +302,10 @@ public class Downloader {
 						threadInfo.updateAll("mUrl = ? and mThreadId= ?", mDownPath, threadId + "");
 
 
-						FileStatus status = new FileStatus();
-						int sum = DataSupport.where("mUrl = ?", urlstr).sum(ThreadInfo.class, "mCompleteSize", int.class);
-						status.setCompleteSize(sum);
-						status.updateAll("mUrl = ? ", mDownPath);
+//						FileStatus status = new FileStatus();
+//						int sum = DataSupport.where("mUrl = ?", urlstr).sum(ThreadInfo.class, "mCompleteSize", int.class);
+//						status.setCompleteSize(sum);
+//						status.updateAll("mUrl = ? ", mDownPath);
 
 						// 用消息将下载信息传给进度条，对进度条进行更新
 						Message message = Message.obtain();
@@ -360,7 +357,6 @@ public class Downloader {
 		}
 
 	}
-
 
 
 	private class TrustAllManager implements X509TrustManager {

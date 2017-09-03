@@ -218,6 +218,16 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
+		List<FileStatus> fileStatusList = DownloadService.mFileStatusList;
+		for (FileStatus status : fileStatusList) {
+
+			FileStatus temp = new FileStatus();
+			temp.setCompleteSize(status.getCompleteSize());
+			temp.setStatus(status.getStatus());
+			temp.updateAll("mUrl = ?", status.getUrl());
+
+		}
+
 		unbindService(this);
 	}
 
