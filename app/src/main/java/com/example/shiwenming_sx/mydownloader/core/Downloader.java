@@ -244,6 +244,7 @@ public class Downloader implements InitThread.InitListener {
 						randomAccessFile.write(buffer, 0, length);
 						compeleteSize += length;
 						// 更新数据库中的下载信息
+
 						ThreadInfo threadInfo = new ThreadInfo();
 						threadInfo.setCompleteSize(compeleteSize);
 						threadInfo.updateAll("mUrl = ? and mThreadId= ?", mDownPath, threadId + "");

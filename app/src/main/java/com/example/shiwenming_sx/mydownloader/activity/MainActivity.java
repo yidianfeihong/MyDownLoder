@@ -72,8 +72,8 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 
 	}
 
-//
-//	@Subscribe(threadMode = ThreadMode.BACKGROUND)
+
+//	@Subscribe(threadMode = ThreadMode.ASYNC)
 //	public void onDatabaseEvent(FileStatus fileStatus) {
 //
 //

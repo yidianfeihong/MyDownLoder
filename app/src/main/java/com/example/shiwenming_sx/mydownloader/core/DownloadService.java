@@ -104,9 +104,10 @@ public class DownloadService extends Service {
 					temp.updateAll("mUrl = ?", url);
 				}
 				mFileStatus = fileStatus;
+				EventBus.getDefault().post(mFileStatus);
 			}
 
-			EventBus.getDefault().post(mFileStatus);
+
 		}
 	}
 
