@@ -25,263 +25,276 @@ import java.util.concurrent.Executors;
 
 public class DownloadService extends Service {
 
-    public static Map<String, Downloader> mDownloaders = new HashMap<String, Downloader>();
-    public static List<FileStatus> mFileStatusList = new ArrayList<FileStatus>();
-    public static Map<String, Integer> mCompleteSizeMap = new HashMap<String, Integer>();
+	public static Map<String, Downloader> mDownloaders = new HashMap<String, Downloader>();
+	public static List<FileStatus> mFileStatusList = new ArrayList<FileStatus>();
+	public static Map<String, Integer> completeSizes = new HashMap<String, Integer>();
+	private FileStatus mFileStatus = null;
+	private String mSavePath = "/sdcard/MyDownloader/";
 
+	private ExecutorService mExecutors;
 
-    private FileStatus mFileStatus = null;
-    private String mSavePath = "/sdcard/MyDownloader/";
-    private ExecutorService mFixedThreadPool;
+	private Downloader mDownloader;
+	private DownLoadCallback loadCallback;
 
-    private Downloader mDownloader;
-    private DownLoadCallback loadCallback;
 
+	private Handler mHandler = new Handler() {
+		@Override
+		public void handleMessage(Message msg) {
+			super.handleMessage(msg);
 
-    private Handler mHandler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
+			switch (msg.what) {
 
-            switch (msg.what) {
+				case 0:
+					Toast.makeText(DownloadService.this, "请求成功，开始下载", Toast.LENGTH_SHORT).show();
+					break;
+				case 1:
+					updateInfo(msg);
+					break;
+				case 2:
+					int responseCode = msg.arg1;
+					if (responseCode >= 400 && responseCode < 500) {
+						Toast.makeText(DownloadService.this, responseCode + "请求错误", Toast.LENGTH_SHORT).show();
+					} else if (responseCode >= 500) {
+						Toast.makeText(DownloadService.this, responseCode + "服务器错误", Toast.LENGTH_SHORT).show();
+					} else {
+						Toast.makeText(DownloadService.this, "状态码异常", Toast.LENGTH_SHORT).show();
+					}
+					break;
+				case 3:
+					String str = ((Exception) msg.obj).toString();
+					Toast.makeText(DownloadService.this, str, Toast.LENGTH_SHORT).show();
+					break;
+			}
+		}
 
-                case 0:
-                    Toast.makeText(DownloadService.this, "请求成功，开始下载", Toast.LENGTH_SHORT).show();
-                    break;
-                case 1:
-                    updateInfo(msg);
-                    break;
-                case 2:
-                    int responseCode = msg.arg1;
-                    if (responseCode >= 400 && responseCode < 500) {
-                        Toast.makeText(DownloadService.this, responseCode + "请求错误", Toast.LENGTH_SHORT).show();
-                    } else if (responseCode >= 500) {
-                        Toast.makeText(DownloadService.this, responseCode + "服务器错误", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(DownloadService.this, "状态码异常", Toast.LENGTH_SHORT).show();
-                    }
-                    break;
-                case 3:
-                    String str = msg.obj.toString();
-                    Toast.makeText(DownloadService.this, str, Toast.LENGTH_SHORT).show();
-                    break;
-            }
-        }
+	};
 
-    };
+	private void updateInfo(Message msg) {
 
-    private void updateInfo(Message msg) {
 
+		String url = (String) msg.obj;
+		int length = msg.arg1;
 
-        String url = (String) msg.obj;
-        int length = msg.arg1;
+		int completeSize = completeSizes.get(url);
 
-        int completeSize = mCompleteSizeMap.get(url);
+		completeSize += length;
+		completeSizes.put(url, completeSize);
 
-        completeSize += length;
-        mCompleteSizeMap.put(url, completeSize);
+		synchronized (mFileStatusList) {
+			for (int i = 0; i < mFileStatusList.size(); i++) {
+				FileStatus fileStatus = mFileStatusList.get(i);
+				if (fileStatus.getUrl().equals(url)) {
+					fileStatus.setCompleteSize(completeSize);
+					//更新数据库
+					FileStatus temp = new FileStatus();
+					if (completeSize == fileStatus.getFileSize()) {
 
-        synchronized (mFileStatusList) {
-            for (int i = 0; i < mFileStatusList.size(); i++) {
-                FileStatus fileStatus = mFileStatusList.get(i);
-                if (fileStatus.getUrl().equals(url)) {
-                    fileStatus.setCompleteSize(completeSize);
-                    //更新数据库
-                    FileStatus temp = new FileStatus();
-                    if (completeSize == fileStatus.getFileSize()) {
+						temp.setStatus(1);
+						temp.updateAll("mUrl = ?", url);
 
-                        temp.setStatus(1);
-                        temp.updateAll("mUrl = ?", url);
 
+					} else {
 
-                    } else {
+						temp.setStatus(0);
+					}
 
-                        temp.setStatus(0);
-                    }
+					mFileStatus = fileStatus;
+				}
+			}
 
-                    mFileStatus = fileStatus;
-                }
-            }
 
+			if (loadCallback != null && mFileStatus != null) {
+				loadCallback.refreshUI(mFileStatus);
+			}
+		}
+	}
 
-            if (loadCallback != null && mFileStatus != null) {
-                loadCallback.refreshUI(mFileStatus);
-            }
-        }
-    }
 
+	public IBinder binder = new MyBinder();
 
-    public IBinder binder = new MyBinder();
+	public class MyBinder extends Binder {
 
-    public class MyBinder extends Binder {
+		public DownloadService getService() {
+			return DownloadService.this;
+		}
 
-        public DownloadService getService() {
-            return DownloadService.this;
-        }
+	}
 
-    }
+	public DownloadService() {
+	}
 
-    public DownloadService() {
-    }
+	@Override
+	public IBinder onBind(Intent intent) {
+		return binder;
+	}
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return binder;
-    }
 
+	@Override
+	public void onCreate() {
+		super.onCreate();
 
-    @Override
-    public void onCreate() {
-        super.onCreate();
+		mFileStatusList = DataSupport.findAll(FileStatus.class);
+		mExecutors = Executors.newCachedThreadPool();
+
+	}
 
-        mFileStatusList = DataSupport.findAll(FileStatus.class);
+
+	public void startDownload(final String fileName, final String url) {
+
+		if (DataSupport.where("mUrl = ?", url).count(FileStatus.class) > 0) {
+
+			Toast.makeText(this, "任务已在列表中", Toast.LENGTH_SHORT).show();
+			return;
+		}
+
+
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
 
-        mFixedThreadPool = Executors.newFixedThreadPool(15);
+				mDownloader = mDownloaders.get(url);
+				if (mDownloader == null) {
+					mDownloader = new Downloader(fileName, mSavePath, url, mHandler);
+					mDownloaders.put(url, mDownloader);
+				}
 
-    }
+				if (mDownloader.isDownloading()) {
+					return;
+				}
 
+				LoadInfo loadInfo = mDownloader.getDownloaderInfos();
 
-    public void startDownload(final String fileName, final String url) {
+				if (loadInfo != null) {
+					FileStatus fileStatus = new FileStatus(fileName, url, 0, loadInfo.getComplete(), loadInfo.getFileSize());
+					fileStatus.save();
+					completeSizes.put(url, loadInfo.getComplete());
+					mFileStatusList.add(fileStatus);
+					Message message = Message.obtain();
+					message.arg1 = 0;
+					mHandler.sendMessage(message);
+					mDownloader.download();
 
-        if (DataSupport.where("mUrl = ?", url).count(FileStatus.class) > 0) {
+				}
 
-            Toast.makeText(this, "任务已在列表中", Toast.LENGTH_SHORT).show();
-            return;
-        }
 
+			}
+		}).start();
+	}
 
-        mDownloader = mDownloaders.get(url);
-        if (mDownloader == null) {
-            mDownloader = new Downloader(fileName, mSavePath, url, mHandler);
-            mDownloaders.put(url, mDownloader);
-        }
+	//暂停下载
+	public void Pause(Downloader downloader) {
+		downloader.pause();
+	}
 
-        if (mDownloader.isDownloading()) {
-            return;
-        }
+	//继续下载
+	public void continueDownload(final String fileName, final String url) {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				mDownloader = mDownloaders.get(url);
+				if (mDownloader == null) {
+					mDownloader = new Downloader(fileName, mSavePath, url, mHandler);
+					mDownloaders.put(url, mDownloader);
+				}
+				if (mDownloader.isDownloading())
+					return;
 
-        LoadInfo loadInfo = mDownloader.getDownloaderInfos();
+				LoadInfo loadInfo = mDownloader.getDownloaderInfos();
 
-        if (loadInfo != null) {
-            FileStatus fileStatus = new FileStatus(fileName, url, 0, loadInfo.getComplete(), loadInfo.getFileSize());
-            fileStatus.save();
-            mCompleteSizeMap.put(url, loadInfo.getComplete());
-            mFileStatusList.add(fileStatus);
-            Message message = Message.obtain();
-            message.arg1 = 0;
-            mHandler.sendMessage(message);
-            mDownloader.download();
+				if (loadInfo != null && !fileName.equals("")) {
+					if (!completeSizes.containsKey(url)) {
+						completeSizes.put(url, loadInfo.getComplete());
+					}
+					mDownloader.download();
 
-        }
+				}
+			}
+		}).start();
+	}
 
-    }
+	public void delete(String fileName, final String url) {
+		Downloader down = mDownloaders.get(url);
+		if (down != null) {
+			down.pause();
+		}
 
-    //暂停下载
-    public void Pause(Downloader downloader) {
-        downloader.pause();
-    }
+		DataSupport.deleteAll(FileStatus.class, "mUrl = ?", url);
+		DataSupport.deleteAll(ThreadInfo.class, "mUrl = ?", url);
 
-    //继续下载
-    public void continueDownload(final String fileName, final String url) {
 
-        mDownloader = mDownloaders.get(url);
-        if (mDownloader == null) {
-            mDownloader = new Downloader(fileName, mSavePath, url, mHandler);
-            mDownloaders.put(url, mDownloader);
-        }
-        if (mDownloader.isDownloading())
-            return;
+		File file = new File(mSavePath + fileName);
+		if (file.exists()) {
+			file.delete();
+		}
 
-        LoadInfo loadInfo = mDownloader.getDownloaderInfos();
+		mHandler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				for (int i = 0; i < mFileStatusList.size(); i++) {
+					FileStatus fileStatus = mFileStatusList.get(i);
+					if (fileStatus.getUrl().equals(url)) {
+						mFileStatusList.remove(i);
+					}
+				}
 
-        if (loadInfo != null && !fileName.equals("")) {
-            if (!mCompleteSizeMap.containsKey(url)) {
-                mCompleteSizeMap.put(url, loadInfo.getComplete());
-            }
-            mDownloader.download();
+				mDownloaders.remove(url);
+				completeSizes.remove(url);
+				if (loadCallback != null) {
+					loadCallback.deleteFile(url);
+				}
+			}
+		}, 500);
 
-        }
+	}
 
 
-    }
+	//暂停下载
+	public void reDownload(final FileStatus fileStatus) {
 
-    public void delete(String fileName, final String url) {
-        Downloader down = mDownloaders.get(url);
-        if (down != null) {
-            down.pause();
-        }
 
-        DataSupport.deleteAll(FileStatus.class, "mUrl = ?", url);
-        DataSupport.deleteAll(ThreadInfo.class, "mUrl = ?", url);
+		final String fileName = fileStatus.getFileName();
+		final String url = fileStatus.getUrl();
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
 
+				Downloader downloader = mDownloaders.get(url);
+				if (downloader != null) {
+					downloader.pause();
+				}
 
-        File file = new File(mSavePath + fileName);
-        if (file.exists()) {
-            file.delete();
-        }
+				downloader = new Downloader(fileName, mSavePath, url, mHandler);
 
-        mHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                for (int i = 0; i < mFileStatusList.size(); i++) {
-                    FileStatus fileStatus = mFileStatusList.get(i);
-                    if (fileStatus.getUrl().equals(url)) {
-                        mFileStatusList.remove(i);
-                    }
-                }
+				DataSupport.deleteAll(ThreadInfo.class, "mUrl = ?", url);
+				mDownloaders.put(url, downloader);
 
-                mDownloaders.remove(url);
-                mCompleteSizeMap.remove(url);
-                if (loadCallback != null) {
-                    loadCallback.deleteFile(url);
-                }
-            }
-        }, 500);
+				LoadInfo loadInfo = downloader.getDownloaderInfos();
+				if (loadInfo != null) {
 
-    }
+					FileStatus stat = new FileStatus();
+					stat.setCompleteSize(0);
+					stat.setStatus(0);
+					stat.updateAll("mUrl = ?", url);
+					completeSizes.put(url, loadInfo.getComplete());
+					downloader.download();
+				}
 
+			}
+		}).start();
 
-    //重新下载
-    public void reDownload(final FileStatus fileStatus) {
 
+	}
 
-        final String fileName = fileStatus.getFileName();
-        final String url = fileStatus.getUrl();
 
-        Downloader downloader = mDownloaders.get(url);
-        if (downloader != null) {
-            downloader.pause();
-        }
+	public interface DownLoadCallback {
+		public void refreshUI(FileStatus fileStatus);
 
-        downloader = new Downloader(fileName, mSavePath, url, mHandler);
+		public void deleteFile(String url);
+	}
 
-        DataSupport.deleteAll(ThreadInfo.class, "mUrl = ?", url);
-        mDownloaders.put(url, downloader);
-
-        LoadInfo loadInfo = downloader.getDownloaderInfos();
-        if (loadInfo != null) {
-
-            FileStatus stat = new FileStatus();
-            stat.setCompleteSize(0);
-            stat.setStatus(0);
-            stat.updateAll("mUrl = ?", url);
-            mCompleteSizeMap.put(url, loadInfo.getComplete());
-            downloader.download();
-        }
-
-    }
-
-
-    public interface DownLoadCallback {
-        public void refreshUI(FileStatus fileStatus);
-
-        public void deleteFile(String url);
-
-    }
-
-    public void setLoadCallback(DownLoadCallback loadCallback) {
-        this.loadCallback = loadCallback;
-    }
+	public void setLoadCallback(DownLoadCallback loadCallback) {
+		this.loadCallback = loadCallback;
+	}
 
 
 }
