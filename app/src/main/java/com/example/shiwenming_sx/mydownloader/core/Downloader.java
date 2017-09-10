@@ -1,4 +1,4 @@
-package com.example.shiwenming_sx.mydownloader.utils;
+package com.example.shiwenming_sx.mydownloader.core;
 
 import android.os.Handler;
 import android.os.Message;
@@ -6,6 +6,7 @@ import android.os.Message;
 import com.example.shiwenming_sx.mydownloader.entity.FileStatus;
 import com.example.shiwenming_sx.mydownloader.entity.LoadInfo;
 import com.example.shiwenming_sx.mydownloader.entity.ThreadInfo;
+import com.example.shiwenming_sx.mydownloader.utils.Constants;
 
 import org.litepal.crud.DataSupport;
 
@@ -14,11 +15,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
-
 import java.net.URL;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,162 +25,52 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
+
 
 /**
  * Created by shiwenming_sx on 2017/8/29.
  */
 
-public class Downloader {
+public class Downloader implements InitThread.InitListener {
 	private String mDownPath;
 	private String mSavePath;
 
 	private String mFileName;
-	private int mThreadCount = 5;
+	private int mThreadCount;
 	private Handler mHandler;
 
 	private int mFileSize;
+	private InitThread mInitThread;
 
 	private List<ThreadInfo> mThreadInfoList;// 存放下载信息类的集合
-	private int mState = INIT;
-	private static final int INIT = 1;// 定义三种下载的状态：初始化状态，正在下载状态，暂停状态
-	private static final int DOWNLOADING = 2;
-	private static final int PAUSE = 3;
+	private int mState = Constants.INIT;
 
 
-	public Downloader(String fileName, String savePath, String url, Handler handler) {
-		mSavePath = savePath;
+	public Downloader(String fileName, String url, Handler handler) {
+		mSavePath = Constants.mSavePath;
 		mDownPath = url;
 		mFileName = fileName;
 		mHandler = handler;
+		mThreadCount = Constants.THREAD_COUNT;
 
 	}
 
 
 	public boolean isDownloading() {
-		return mState == DOWNLOADING;
+		return mState == Constants.DOWNLOADING;
 	}
 
 
-	public boolean isPause() {
-		return mState == PAUSE;
+	public boolean isPaused() {
+		return mState == Constants.PAUSED;
 	}
 
-
-	/**
-	 * 获取下载器基本信息，用以判断状态是否正常
-	 **/
-
-	public LoadInfo getDownloaderInfos() {
-		if (isFirst(mDownPath)) {
-			if (init())// 第1次下载要进行初始化
-			{
-				int range = mFileSize / mThreadCount;
-				mThreadInfoList = new ArrayList<ThreadInfo>();
-				for (int i = 0; i < mThreadCount - 1; i++) {
-					ThreadInfo info = new ThreadInfo(i, i * range, (i + 1) * range - 1, 0, mDownPath);
-					mThreadInfoList.add(info);
-				}
-
-				ThreadInfo info = new ThreadInfo(mThreadCount - 1, (mThreadCount - 1) * range, mFileSize, 0, mDownPath);
-				mThreadInfoList.add(info);
-				for (ThreadInfo item : mThreadInfoList) {
-					item.save();
-				}
-
-				LoadInfo loadInfo = new LoadInfo(mFileSize, 0, mDownPath);
-				return loadInfo;
-			}
-			return null;
-		} else {
-			mThreadInfoList = DataSupport.where("mUrl = ?", mDownPath).find(ThreadInfo.class);
-			if (mThreadInfoList != null && mThreadInfoList.size() > 0) {
-				int size = 0;
-				int completeSize = 0;
-				for (ThreadInfo info : mThreadInfoList) {
-					completeSize += info.getCompleteSize();
-					size += info.getEndPos() - info.getStartPos() + mThreadCount - 1;
-				}
-				LoadInfo loadInfo = new LoadInfo(size, completeSize, mDownPath);
-				return loadInfo;
-			}
-			return null;
-		}
+	public int getState() {
+		return mState;
 	}
 
-	/**
-	 * 初始化
-	 */
-	private Boolean init() {
-		boolean result = false;
-
-		HttpURLConnection conn = null;
-		RandomAccessFile randomFile = null;
-		try {
-			URL url = new URL(mDownPath);
-			conn = (HttpURLConnection) url.openConnection();
-			constructHttps(conn);
-			conn.setConnectTimeout(5000);
-			conn.setRequestMethod("GET");
-			int responseCode = conn.getResponseCode();
-			// 如果http返回的代码是302则获取跳转地址重新发起请求
-			if (responseCode == 302) {
-				String location = conn.getHeaderField("Location");
-				url = new URL(location);
-				conn = (HttpURLConnection) url.openConnection();
-				conn.setConnectTimeout(5000);
-				conn.setRequestMethod("GET");
-				responseCode = conn.getResponseCode();
-			}
-
-			// 如果http返回的代码是200或者206则为连接成功
-			if (responseCode == 200 || responseCode == 206) {
-				result = true;
-				mFileSize = conn.getContentLength();// 得到文件的大小
-				if (mFileSize <= 0) {
-					System.out.println("网络故障,无法获取文件大小");
-					return false;
-				}
-				File dir = new File(mSavePath);
-				// 如果文件目录不存在,则创建
-				if (!dir.exists()) {
-					if (dir.mkdirs()) {
-						System.out.println("mkdirs success.");
-					}
-				}
-				File file = new File(this.mSavePath, this.mFileName);
-				randomFile = new RandomAccessFile(file, "rwd");
-				randomFile.setLength(mFileSize);// 设置保存文件的大小
-				randomFile.close();
-				conn.disconnect();
-			} else {
-
-				Message message = Message.obtain();
-				message.what = 2;
-				message.arg1 = responseCode;
-				mHandler.sendMessage(message);
-			}
-		} catch (Exception e) {
-
-			Message message = Message.obtain();
-			message.what = 3;
-			message.obj = e;
-			mHandler.sendMessage(message);
-
-			e.printStackTrace();
-			System.out.println("----------------首次下载初始化失败----------------");
-		} finally {
-			try {
-				if (randomFile != null) {
-					randomFile.close();
-				}
-				if (conn != null) {
-					conn.disconnect();
-				}
-			} catch (Exception e2) {
-			}
-		}
-		return result;
+	public void setState(int state) {
+		mState = state;
 	}
 
 	/**
@@ -190,24 +78,24 @@ public class Downloader {
 	 */
 	public void download() {
 		if (mThreadInfoList != null) {
-			if (mState == DOWNLOADING) {
+			if (mState == Constants.DOWNLOADING) {
 				return;
 			}
-			mState = DOWNLOADING;// 把状态设置为正在下载
+			mState = Constants.DOWNLOADING;// 把状态设置为正在下载
 			for (ThreadInfo info : mThreadInfoList) {
-				new MyThread(info.getThreadId(), info.getStartPos(), info.getEndPos(), info.getCompleteSize(), info.getUrl()).start();
+				ThreadPoolManager.getThreadPool().execute(new MyThread(info.getThreadId(), info.getStartPos(), info.getEndPos(), info.getCompleteSize(), info.getUrl()));
 			}
 		}
 	}
 
 	// 设置暂停
 	public void pause() {
-		mState = PAUSE;
+		mState = Constants.PAUSED;
 	}
 
 	// 重置下载状态,将下载状态设置为init初始化状态
 	public void reset() {
-		mState = INIT;
+		mState = Constants.INIT;
 	}
 
 	/**
@@ -236,7 +124,77 @@ public class Downloader {
 	}
 
 
-	public class MyThread extends Thread {
+	@Override
+	public void onConnected(int totalLength) {
+
+		mFileSize = totalLength;
+
+		int range = mFileSize / mThreadCount;
+		mThreadInfoList = new ArrayList<>();
+		for (int i = 0; i < mThreadCount - 1; i++) {
+			ThreadInfo info = new ThreadInfo(i, i * range, (i + 1) * range - 1, 0, mDownPath);
+			mThreadInfoList.add(info);
+		}
+
+		ThreadInfo info = new ThreadInfo(mThreadCount - 1, (mThreadCount - 1) * range, mFileSize, 0, mDownPath);
+		mThreadInfoList.add(info);
+		for (ThreadInfo item : mThreadInfoList) {
+			item.save();
+		}
+
+		Message message = Message.obtain();
+		message.what = 4;
+		message.obj = new LoadInfo(mDownPath, mFileSize, 0);
+		mHandler.sendMessage(message);
+
+		download();
+	}
+
+	@Override
+	public void onWrongResponse(int responseCode) {
+		Message ms = Message.obtain();
+		ms.what = 2;
+		ms.arg1 = responseCode;
+		mHandler.sendMessage(ms);
+	}
+
+	@Override
+	public void onError(String message) {
+		Message ms = Message.obtain();
+		ms.what = 3;
+		ms.obj = message;
+		mHandler.sendMessage(ms);
+
+	}
+
+	public void start() {
+
+		if (isFirst(mDownPath)) {
+			mInitThread = new InitThread(mDownPath, mFileName, this);
+			ThreadPoolManager.getThreadPool().execute(mInitThread);
+		} else {
+			mThreadInfoList = DataSupport.where("mUrl = ?", mDownPath).find(ThreadInfo.class);
+			if (mThreadInfoList != null && mThreadInfoList.size() > 0) {
+				int size = 0;
+				int completeSize = 0;
+				for (ThreadInfo info : mThreadInfoList) {
+					completeSize += info.getCompleteSize();
+					size += info.getEndPos() - info.getStartPos() + mThreadCount - 1;
+				}
+
+				Message message = Message.obtain();
+				message.what = 5;
+				message.obj = new LoadInfo(mDownPath, size, completeSize);
+				mHandler.sendMessage(message);
+
+				download();
+			}
+		}
+
+	}
+
+
+	public class MyThread implements Runnable {
 		private int threadId;
 		private int startPos;
 		private int endPos;
@@ -302,7 +260,7 @@ public class Downloader {
 						message.obj = urlstr;
 						message.arg1 = length;
 						mHandler.sendMessage(message);// 给DownloadService发送消息
-						if (mState == PAUSE) {
+						if (mState == Constants.PAUSED) {
 							System.out.println("-----pause-----");
 							return;
 						}
@@ -333,9 +291,8 @@ public class Downloader {
 
 		}
 
-
 		/**
-		 * 构建请求连接时的参数 返回开始下载的位置
+		 * 构建请求连接时的参数
 		 */
 		private void constructConn(HttpURLConnection conn) throws IOException {
 
@@ -349,30 +306,5 @@ public class Downloader {
 		}
 
 	}
-
-
-	private class TrustAllManager implements X509TrustManager {
-
-		@Override
-		public void checkClientTrusted(X509Certificate[] chain, String authType)
-				throws CertificateException {
-			// TODO Auto-generated method stub
-
-		}
-
-		@Override
-		public void checkServerTrusted(X509Certificate[] chain, String authType)
-				throws CertificateException {
-			// TODO Auto-generated method stub
-
-		}
-
-		@Override
-		public X509Certificate[] getAcceptedIssuers() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-	}
-
 
 }

@@ -13,10 +13,10 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.example.shiwenming_sx.mydownloader.R;
+import com.example.shiwenming_sx.mydownloader.core.DownloadManager;
 import com.example.shiwenming_sx.mydownloader.entity.FileStatus;
-import com.example.shiwenming_sx.mydownloader.service.DownloadService;
-import com.example.shiwenming_sx.mydownloader.utils.Downloader;
-import com.example.shiwenming_sx.mydownloader.utils.MyApplication;
+import com.example.shiwenming_sx.mydownloader.core.DownloadService;
+import com.example.shiwenming_sx.mydownloader.utils.Constants;
 
 import java.util.List;
 
@@ -28,14 +28,16 @@ import java.util.List;
 public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHolder> {
 
 
-	public List<FileStatus> mFileStatuses;
+	public List<FileStatus> mFileStatusList;
 	private DownloadService mService;
 	private Context mContext;
 
-	public DownloadAdapter(Context context, DownloadService service, List<FileStatus> fileStatuses) {
+
+	public DownloadAdapter(Context context, DownloadService service,List<FileStatus> fileStatusList) {
 		mContext = context;
 		mService = service;
-		mFileStatuses = fileStatuses;
+		mFileStatusList = fileStatusList;
+
 	}
 
 	@Override
@@ -48,15 +50,15 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 	@Override
 	public void onBindViewHolder(final ViewHolder holder, int position) {
 
-		final FileStatus fileStatus = mFileStatuses.get(position);
-		final Downloader downloader = DownloadService.mDownloaders.get(fileStatus.getUrl());
-		if (fileStatus.getCompleteSize() == fileStatus.getFileSize()) {
+		final FileStatus fileStatus = mFileStatusList.get(position);
+
+		if (fileStatus.getStatus()== Constants.COMPLETED) {
 			holder.statusChange.setText("已完成");
 			holder.downProgress.setVisibility(View.GONE);
 			holder.progressBar.setVisibility(View.GONE);
 		} else {
 
-			if (downloader != null && downloader.isDownloading()) {
+			if (fileStatus.getStatus()==Constants.DOWNLOADING) {
 				holder.statusChange.setText("暂停");
 			} else {
 				holder.statusChange.setText("开始");
@@ -79,11 +81,9 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 				if (fileStatus.getCompleteSize() == fileStatus.getFileSize()) {
 					return;
 				}
-				if (downloader != null && downloader.isDownloading()) {
-					((Button) view).setText("开始");
-					mService.Pause(downloader);
+				if (fileStatus.getStatus()==1) {
+					mService.Pause(fileStatus);
 				} else {
-					holder.statusChange.setText("暂停");
 					mService.continueDownload(fileStatus.getFileName(), fileStatus.getUrl());
 				}
 			}
@@ -96,7 +96,7 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 				builder.setTitle("温馨提示").setMessage("确定要删除文件吗").setPositiveButton("确定", new DialogInterface.OnClickListener() {
 					@Override
 					public void onClick(DialogInterface arg0, int arg1) {
-						mService.delete(fileStatus.getFileName(),fileStatus.getUrl());
+						mService.delete(fileStatus.getFileName(), fileStatus.getUrl());
 					}
 				}).setNegativeButton("取消", null).create().show();
 
@@ -114,7 +114,7 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
 
 	@Override
 	public int getItemCount() {
-		return mFileStatuses.size();
+		return mFileStatusList.size();
 	}
 
 

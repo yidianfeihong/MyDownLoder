@@ -10,9 +10,8 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Message;
+
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -24,23 +23,18 @@ import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ProgressBar;
-import android.widget.SeekBar;
-import android.widget.TextView;
+
 import android.widget.Toast;
 
-import com.example.shiwenming_sx.mydownloader.BuildConfig;
 import com.example.shiwenming_sx.mydownloader.R;
 import com.example.shiwenming_sx.mydownloader.adapter.DownloadAdapter;
+import com.example.shiwenming_sx.mydownloader.core.DownloadService;
 import com.example.shiwenming_sx.mydownloader.entity.FileStatus;
-import com.example.shiwenming_sx.mydownloader.service.DownloadService;
-import com.example.shiwenming_sx.mydownloader.utils.Downloader;
-import com.example.shiwenming_sx.mydownloader.utils.MyApplication;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
 
 public class MainActivity extends AppCompatActivity implements ServiceConnection, View.OnClickListener {
 
@@ -60,6 +54,39 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 			Manifest.permission.READ_EXTERNAL_STORAGE};
 
 
+	@Subscribe(threadMode = ThreadMode.MAIN)
+	public void onUpdateEvent(FileStatus fileStatus) {
+		if (fileStatus.getCompleteSize() == fileStatus.getFileSize()) {
+			mAdapter.notifyDataSetChanged();
+			return;
+		}
+
+		for (int i = 0; i < mAdapter.mFileStatusList.size(); i++) {
+
+			if (mAdapter.mFileStatusList.get(i).getUrl().equals(fileStatus.getUrl())) {
+				mAdapter.mFileStatusList.set(i, fileStatus);
+				mAdapter.notifyItemChanged(i);
+				return;
+			}
+		}
+
+	}
+
+//
+//	@Subscribe(threadMode = ThreadMode.BACKGROUND)
+//	public void onDatabaseEvent(FileStatus fileStatus) {
+//
+//
+//	}
+
+	@Subscribe(threadMode = ThreadMode.MAIN)
+	public void onDeleteEvent(String url) {
+
+		mAdapter.notifyDataSetChanged();
+
+	}
+
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -69,6 +96,9 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 		if (Build.VERSION.SDK_INT >= 23) {
 			verifyStoragePermissions(this);
 		}
+
+
+		EventBus.getDefault().register(this);
 
 		Intent intent = new Intent(this, DownloadService.class);
 		startService(intent);
@@ -133,37 +163,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 			mAdapter = new DownloadAdapter(MainActivity.this, mService, DownloadService.mFileStatusList);
 			mRecyclerView.setAdapter(mAdapter);
 			((DefaultItemAnimator) mRecyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
-
-			mService.setLoadCallback(new DownloadService.DownLoadCallback() {
-				@Override
-				public void refreshUI(FileStatus fileStatus) {
-
-					if (fileStatus.getCompleteSize() == fileStatus.getFileSize()) {
-						mAdapter.notifyDataSetChanged();
-						return;
-					}
-
-					for (int i = 0; i < mAdapter.mFileStatuses.size(); i++) {
-
-						if (mAdapter.mFileStatuses.get(i).getUrl().equals(fileStatus.getUrl())) {
-							mAdapter.mFileStatuses.set(i, fileStatus);
-							mAdapter.notifyItemChanged(i);
-							return;
-						}
-
-					}
-
-				}
-
-				@Override
-				public void deleteFile(String url) {
-					mAdapter.notifyDataSetChanged();
-				}
-
-			});
 		}
-
-
 	}
 
 	@Override
@@ -179,6 +179,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 			case R.id.btn_download:
 				mUrl = mEtUrl.getText().toString().trim();
 				mName = getFileName(mUrl);
+
 				mService.startDownload(mName, mUrl);
 				break;
 
@@ -218,6 +219,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
+		EventBus.getDefault().unregister(this);
 		unbindService(this);
 	}
 

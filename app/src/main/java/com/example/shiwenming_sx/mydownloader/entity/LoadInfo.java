@@ -2,11 +2,13 @@ package com.example.shiwenming_sx.mydownloader.entity;
 
 import org.litepal.crud.DataSupport;
 
+import java.io.Serializable;
+
 /**
  * Created by shiwenming_sx on 2017/8/29.
  */
 
-public class LoadInfo {
+public class LoadInfo implements Serializable{
 
 
 	private int mFileSize;
@@ -14,7 +16,7 @@ public class LoadInfo {
 	private String mUrl;
 
 
-	public LoadInfo(int fileSize, int complete, String url) {
+	public LoadInfo(String url, int fileSize, int complete) {
 
 		mFileSize = fileSize;
 		mComplete = complete;
